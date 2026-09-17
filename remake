@@ -817,7 +817,7 @@ make_image() {
 
     # Format bootfs partition
     if [[ "${bootfs_type}" == "fat32" ]]; then
-        mkfs.vfat -F 32 -n "BOOT" ${loop_new}p1 >/dev/null 2>&1
+        mkfs.vfat -F "${boot_fat_type:-32}" -n "BOOT" ${loop_new}p1 >/dev/null 2>&1
     else
         mkfs.ext4 -F -q -U ${BOOT_UUID} -L "BOOT" -b 4k -m 0 ${loop_new}p1 >/dev/null 2>&1
     fi
