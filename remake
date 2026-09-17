@@ -1039,6 +1039,24 @@ refactor_bootfs() {
 
     # Check device configuration files
     [[ -f "${uenv_conf_file}" || -f "${rename_extlinux_file}" || -f "${armbianenv_conf_file}" ]] || error_msg "Missing boot configuration file [ /boot/*Env.txt ]."
+
+    # SC2/S905X4 has no open u-boot and boots via the stock vendor u-boot +
+    # aml_autoscript. Remove the generic Amlogic u-boot/scripts pulled in from
+    # the shared platform bootfs, keep only the SC2 devicetrees, and drop the
+    # redundant vmlinuz copy (zImage is what gets booted).
+    if [[ "${PLATFORM}" == "amlogic" && "${FAMILY}" == "meson-sc2" ]]; then
+        rm -f u-boot.sd u-boot.usb u-boot.ext u-boot.emmc \
+            boot.cmd boot.scr boot.ini \
+            boot-emmc.cmd boot-emmc.scr boot-emmc.ini \
+            boot.bmp armbian_first_run.txt.template \
+            "vmlinuz-${kernel_name}"
+        rm -rf extlinux
+        if [[ -d "dtb/amlogic" ]]; then
+            find "dtb/amlogic" -maxdepth 1 -type f -name '*.dtb' \
+                ! -name 'meson-sc2-*.dtb' -delete
+            rm -rf "dtb/amlogic/overlay"
+        fi
+    fi
 }
 
 refactor_rootfs() {
