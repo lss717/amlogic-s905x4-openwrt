@@ -1,0 +1,10 @@
+#!/bin/sh
+# Set the default timezone for HK1 RBOX X4 / Amlogic S905X4.
+# The OpenVFD 7-segment clock (vfdservice) reads /etc/localtime, which
+# /etc/init.d/system points at /usr/share/zoneinfo/${zonename}.
+
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci commit system
+
+exit 0

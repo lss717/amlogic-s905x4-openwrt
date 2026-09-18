@@ -145,6 +145,17 @@ if [[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" && -x "/usr/bin/openwrt-sysled
     log_message "Front LED indicator (openwrt-sysled) started."
 fi
 
+# 7-segment display for HK1 RBOX X4 (Amlogic SC2): FD6551 via OpenVFD
+if [[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" && -x "/usr/sbin/openwrt-openvfd" ]]; then
+    /usr/sbin/openwrt-openvfd 25 >/dev/null 2>&1 &
+    log_message "OpenVFD 7-seg display (hk1rbox-x4) started."
+    # Drive the usb/eth/wifi status icons from the real device state.
+    if [[ -x "/usr/bin/openvfd-icons" ]]; then
+        /usr/bin/openvfd-icons >/dev/null 2>&1 &
+        log_message "OpenVFD status icons (openvfd-icons) started."
+    fi
+fi
+
 # For vplus (Allwinner H6) RGB LED color lights
 if [[ -x "/usr/bin/rgb-vplus" ]]; then
     rgb-vplus --RedName=RED --GreenName=GREEN --BlueName=BLUE >/dev/null 2>&1 &
