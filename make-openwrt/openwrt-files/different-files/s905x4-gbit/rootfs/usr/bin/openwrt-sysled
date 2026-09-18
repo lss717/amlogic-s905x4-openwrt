@@ -6,8 +6,10 @@
 #   blue   (255) : system booted, no network
 #   mixed  (128) : network available (has an IP, internet not required)
 #
-# "Network available" means: a default route exists, or any interface
-# (other than loopback) has a global IPv4 address.
+# "Network available" means: an interface (other than loopback) has a
+# global IPv4 address AND its link is actually up (carrier detected).
+# With a static IP the address is always present, so carrier is what tells
+# whether a cable/WiFi is really connected to a machine.
 #
 # The single GPIO/PWM line drives a red/blue bicolor LED, so only the
 # red:blue duty ratio can be changed (no true off state).
@@ -23,11 +25,16 @@ set_brightness() {
 }
 
 has_network() {
-	# A default route means an uplink/WAN interface came up.
-	ip route show default 2>/dev/null | grep -q . && return 0
-	# Otherwise, any interface other than loopback carries a global IPv4.
-	ip -4 -o addr show scope global 2>/dev/null | awk '{print $2}' \
-		| grep -qvE '^lo$' && return 0
+	for iface in $(ip -4 -o addr show scope global 2>/dev/null | awk '{print $2}'); do
+		[ "${iface}" = "lo" ] && continue
+		carrier="/sys/class/net/${iface}/carrier"
+		if [ -r "${carrier}" ]; then
+			[ "$(cat "${carrier}" 2>/dev/null)" = "1" ] && return 0
+		else
+			# virtual interface without a carrier attribute: assume up
+			return 0
+		fi
+	done
 	return 1
 }
 
