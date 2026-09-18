@@ -6,8 +6,8 @@
 #   blue   (255) : system booted, no network
 #   mixed  (128) : network available (has an IP, internet not required)
 #
-# "Network available" means: a default route exists, or an interface other
-# than the box's own LAN bridge (br-lan) has a global IPv4 address.
+# "Network available" means: a default route exists, or any interface
+# (other than loopback) has a global IPv4 address.
 #
 # The single GPIO/PWM line drives a red/blue bicolor LED, so only the
 # red:blue duty ratio can be changed (no true off state).
@@ -25,9 +25,9 @@ set_brightness() {
 has_network() {
 	# A default route means an uplink/WAN interface came up.
 	ip route show default 2>/dev/null | grep -q . && return 0
-	# Otherwise, an interface other than lo/br-lan carries a global IPv4.
+	# Otherwise, any interface other than loopback carries a global IPv4.
 	ip -4 -o addr show scope global 2>/dev/null | awk '{print $2}' \
-		| grep -qvE '^(lo|br-lan)$' && return 0
+		| grep -qvE '^lo$' && return 0
 	return 1
 }
 
