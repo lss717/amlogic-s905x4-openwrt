@@ -139,6 +139,12 @@ if [[ "${openvfd_boxid}" != "0" && "${FDTFILE}" =~ ^meson- ]]; then
     ) &
 fi
 
+# Front bicolor LED indicator for HK1 RBOX X4 (Amlogic SC2)
+if [[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" && -x "/usr/bin/openwrt-sysled" ]]; then
+    /usr/bin/openwrt-sysled >/dev/null 2>&1 &
+    log_message "Front LED indicator (openwrt-sysled) started."
+fi
+
 # For vplus (Allwinner H6) RGB LED color lights
 if [[ -x "/usr/bin/rgb-vplus" ]]; then
     rgb-vplus --RedName=RED --GreenName=GREEN --BlueName=BLUE >/dev/null 2>&1 &
