@@ -802,6 +802,14 @@ make_image() {
     parted -s "${build_image_file}" mkpart primary ${bootfs_type} $((skip_mb))MiB $((skip_mb + boot_mb - 1))MiB 2>/dev/null
     parted -s "${build_image_file}" mkpart primary btrfs $((skip_mb + boot_mb))MiB 100% 2>/dev/null
 
+    # For SC2/S905X4: pin the MSDOS disk signature so the vendor-u-boot bootscript
+    # can resolve the root partition by PARTUUID. This avoids relying on the mmc
+    # host numbering (mmcblk0/mmcblk1), which is not stable across boots on this
+    # board because the SDIO and SD controllers probe in nondeterministic order.
+    if [[ "${PLATFORM}" == "amlogic" && "${FAMILY}" == "meson-sc2" ]]; then
+        printf '\x58\x30\x44\x53' | dd of="${build_image_file}" bs=1 seek=440 conv=notrunc status=none
+    fi
+
     # Mount the OpenWrt image file
     loop_new="$(losetup -P -f --show "${build_image_file}")"
     [[ -n "${loop_new}" ]] || error_msg "losetup ${build_image_file} failed."
