@@ -5,6 +5,13 @@
 /openwrt-armsr
 /out
 /tmp
+
+# Build-time downloads from the Armbian repo (see remake: platform-files /
+# different-files / common-files). Only our own board is kept tracked.
+/make-openwrt/openwrt-files/platform-files/
+/make-openwrt/openwrt-files/common-files/
+/make-openwrt/openwrt-files/different-files/*
+!/make-openwrt/openwrt-files/different-files/s905x4-gbit/
 .DS_Store
 npm-debug.log*
 *.rej
