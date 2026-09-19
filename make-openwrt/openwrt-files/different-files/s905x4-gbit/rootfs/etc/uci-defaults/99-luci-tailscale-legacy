@@ -20,4 +20,7 @@ if ! uci -q get ucitrack.@tailscale[0] >/dev/null 2>&1; then
 	uci -q commit ucitrack
 fi
 
+# Apply /etc/config/tailscale to the node on boot
+[ -x /etc/init.d/tailscale-settings ] && /etc/init.d/tailscale-settings enable
+
 exit 0
