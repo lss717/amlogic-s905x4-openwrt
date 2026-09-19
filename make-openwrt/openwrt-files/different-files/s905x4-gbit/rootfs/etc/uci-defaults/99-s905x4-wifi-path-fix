@@ -1,0 +1,6 @@
+#!/bin/sh
+# Enable the boot-time self-heal for stale onboard SDIO wifi-device sections.
+
+[ -x /etc/init.d/s905x4-wifi-path-fix ] && /etc/init.d/s905x4-wifi-path-fix enable
+
+exit 0
