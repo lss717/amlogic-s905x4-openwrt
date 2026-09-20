@@ -12,6 +12,7 @@
 /make-openwrt/openwrt-files/common-files/
 /make-openwrt/openwrt-files/different-files/*
 !/make-openwrt/openwrt-files/different-files/s905x4-gbit/
+!/make-openwrt/openwrt-files/different-files/s905x4-hk1/
 .DS_Store
 npm-debug.log*
 *.rej

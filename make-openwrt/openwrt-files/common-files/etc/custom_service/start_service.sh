@@ -140,13 +140,15 @@ if [[ "${openvfd_boxid}" != "0" && "${FDTFILE}" =~ ^meson- ]]; then
 fi
 
 # Front bicolor LED indicator for HK1 RBOX X4 (Amlogic SC2)
-if [[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" && -x "/usr/bin/openwrt-sysled" ]]; then
+sc2_board="no"
+[[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" || "${FDTFILE}" == "meson-sc2-s905x4-hk1-rbox-x4.dtb" ]] && sc2_board="yes"
+if [[ "${sc2_board}" == "yes" && -x "/usr/bin/openwrt-sysled" ]]; then
     /usr/bin/openwrt-sysled >/dev/null 2>&1 &
     log_message "Front LED indicator (openwrt-sysled) started."
 fi
 
 # 7-segment display for HK1 RBOX X4 (Amlogic SC2): FD6551 via OpenVFD
-if [[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" && -x "/usr/sbin/openwrt-openvfd" ]]; then
+if [[ "${sc2_board}" == "yes" && -x "/usr/sbin/openwrt-openvfd" ]]; then
     /usr/sbin/openwrt-openvfd 25 >/dev/null 2>&1 &
     log_message "OpenVFD 7-seg display (hk1rbox-x4) started."
     # Drive the usb/eth/wifi status icons from the real device state.

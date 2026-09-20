@@ -1,0 +1,77 @@
+#!/bin/sh
+#==========================================================================
+# OpenVFD status icons for HK1 RBOX X4 (Amlogic SC2, FD6551 over OpenVFD).
+#
+# The FD6551 exposes three useful status icons on the 7-segment panel:
+#   usb  - lights when any USB device is present (mouse, flash drive, ...)
+#   eth  - lights when the on-board Ethernet link is up (cable plugged)
+#   wifi - lights when a STA interface is connected upstream OR an AP
+#          interface has at least one client
+#
+# alarm/play/pause are media icons and are intentionally left off.
+#
+# The icons are written through /sys/class/leds/openvfd/led_on|led_off
+# (which only updates the driver's in-memory status_led_mask; the actual
+# panel refresh happens with the clock tick). The time and colon are owned
+# by vfdservice and are not touched here.
+#
+# Polling every 2s keeps the implementation dependency-free (no hotplug).
+#==========================================================================
+
+LED="/sys/class/leds/openvfd"
+INTERVAL="2"
+
+usb_present() {
+	# Any non-root-hub USB device has an idVendor. Root hubs are named
+	# usbN and have bDeviceClass=09; interface nodes have no idVendor.
+	for d in /sys/bus/usb/devices/*; do
+		[ -e "${d}" ] || continue
+		n="${d##*/}"
+		case "${n}" in
+		usb*|*-0) continue ;;
+		esac
+		[ -f "${d}/idVendor" ] && return 0
+	done
+	return 1
+}
+
+eth_up() {
+	# On-board RTL8211F link carrier (cable/PHY). Reading fails when the
+	# interface is admin-down, which is also treated as "not connected".
+	[ "$(cat /sys/class/net/eth0/carrier 2>/dev/null)" = "1" ]
+}
+
+wifi_up() {
+	for w in /sys/class/net/*/wireless; do
+		[ -e "${w}" ] || continue
+		i="${w%/wireless}"
+		i="${i##*/}"
+		# STA mode: associated to an upstream AP.
+		iw dev "${i}" link 2>/dev/null | grep -q "^Connected" && return 0
+		# AP mode: at least one connected client.
+		iw dev "${i}" station dump 2>/dev/null | grep -q "^Station" && return 0
+	done
+	return 1
+}
+
+set_icon() {
+	if "${1}"; then
+		echo "${2}" > "${LED}/led_on" 2>/dev/null
+	else
+		echo "${2}" > "${LED}/led_off" 2>/dev/null
+	fi
+}
+
+# Wait for the display (module may load after this script starts).
+while [ ! -w "${LED}/led_on" ]; do
+	sleep "${INTERVAL}"
+done
+
+while :; do
+	if [ -w "${LED}/led_on" ]; then
+		set_icon usb_present usb
+		set_icon eth_up eth
+		set_icon wifi_up wifi
+	fi
+	sleep "${INTERVAL}"
+done

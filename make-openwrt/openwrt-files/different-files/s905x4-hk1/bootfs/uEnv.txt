@@ -1,0 +1,3 @@
+LINUX=/zImage
+FDT=/dtb/amlogic/meson-sc2-s905x4-hk1-rbox-x4.dtb
+APPEND=root=LABEL=ROOTFS console=tty0 no_console_suspend consoleblank=0 coherent_pool=2M net.ifnames=0

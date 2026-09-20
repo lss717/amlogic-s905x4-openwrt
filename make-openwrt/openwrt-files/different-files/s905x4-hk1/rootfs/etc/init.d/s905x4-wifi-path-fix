@@ -1,0 +1,70 @@
+#!/bin/sh /etc/rc.common
+# 板载 SDIO WiFi（BCM4339, fe088000.sdio）的 phy path 会随 Linux 动态分配的
+# MMC 编号变化（如 SD 卡时钟修复后 mmc1 -> mmc0）。OpenWrt 按 path 匹配 wifi
+# radio，配置里 path 失效时会保留旧 radio 再新增一个，LuCI 出现两个同名网络。
+#
+# 开机后（network 已启动、brcmfmac 已加载）删除 path 已不存在的板载 SDIO
+# radio 并 reload wifi。只处理 fe088000.sdio，USB/PCIe 无线绝不触碰。
+
+START=99
+STOP=10
+
+SDIO_PREFIX="platform/soc/fe088000.sdio/"
+
+wifi_path_fix() {
+	[ -f /etc/config/wireless ] || return 0
+	. /lib/functions.sh
+
+	local present="" dev p sdio_present=0
+	for dev in /sys/class/ieee80211/phy*/device; do
+		[ -e "$dev" ] || continue
+		p=$(readlink -f "$dev")
+		[ -n "$p" ] || continue
+		p=${p#/sys/devices/}
+		present="$present $p"
+		case "$p" in "$SDIO_PREFIX"*) sdio_present=1 ;; esac
+	done
+	# 当前看不到板载 SDIO phy -> 什么都不做
+	[ "$sdio_present" = "1" ] || return 0
+
+	local stale=""
+	_collect_stale() {
+		local sec="$1" path
+		config_get path "$sec" path
+		case "$path" in "$SDIO_PREFIX"*) ;; *) return 0 ;; esac
+		case " $present " in *" $path "*) return 0 ;; esac
+		stale="$stale $sec"
+	}
+	config_load wireless
+	config_foreach _collect_stale wifi-device
+	[ -n "$stale" ] || return 0
+
+	local sec ifc d del
+	for sec in $stale; do
+		del=""
+		_collect_ifaces() {
+			local i="$1"
+			config_get d "$i" device
+			[ "$d" = "$sec" ] && del="$del $i"
+		}
+		config_foreach _collect_ifaces wifi-iface
+		for ifc in $del; do uci -q delete "wireless.$ifc"; done
+		uci -q delete "wireless.$sec"
+		logger -t wifi-path-fix "removed stale onboard SDIO wifi-device '$sec'"
+	done
+	uci commit wireless
+	/sbin/wifi reload
+}
+
+start() {
+	# 等板载 phy 出现（brcmfmac 异步加载），最多 ~30s
+	local i
+	for i in $(seq 1 30); do
+		set -- /sys/class/ieee80211/phy*
+		[ -e "$1" ] && break
+		sleep 1
+	done
+	wifi_path_fix
+}
+
+stop() { :; }

@@ -1,0 +1,51 @@
+#!/bin/sh
+#==========================================================================
+# Front bicolor LED (red/blue) indicator for HK1 RBOX X4 (Amlogic SC2).
+#
+#   red          : pre-boot / LED not driven yet (hardware default)
+#   blue   (255) : system booted, no network
+#   mixed  (128) : network available (has an IP, internet not required)
+#
+# "Network available" means: an interface (other than loopback) has a
+# global IPv4 address AND its link is actually up (carrier detected).
+# With a static IP the address is always present, so carrier is what tells
+# whether a cable/WiFi is really connected to a machine.
+#
+# The single GPIO/PWM line drives a red/blue bicolor LED, so only the
+# red:blue duty ratio can be changed (no true off state).
+#==========================================================================
+
+LED="/sys/class/leds/sys_led/brightness"
+INTERVAL="10"
+
+[ -w "${LED}" ] || exit 0
+
+set_brightness() {
+	[ "$(cat "${LED}" 2>/dev/null)" = "${1}" ] || echo "${1}" > "${LED}"
+}
+
+has_network() {
+	for iface in $(ip -4 -o addr show scope global 2>/dev/null | awk '{print $2}'); do
+		[ "${iface}" = "lo" ] && continue
+		carrier="/sys/class/net/${iface}/carrier"
+		if [ -r "${carrier}" ]; then
+			[ "$(cat "${carrier}" 2>/dev/null)" = "1" ] && return 0
+		else
+			# virtual interface without a carrier attribute: assume up
+			return 0
+		fi
+	done
+	return 1
+}
+
+# Boot finished -> blue
+set_brightness 255
+
+while :; do
+	if has_network; then
+		set_brightness 128
+	else
+		set_brightness 255
+	fi
+	sleep "${INTERVAL}"
+done
