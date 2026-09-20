@@ -1,0 +1,18 @@
+#!/bin/sh
+# Show 'cpustat -a' (when available) as the LuCI Overview "Architecture"
+# string. Falls back to the original kernel description + core count.
+f=/usr/lib/lua/luci/view/admin_status/index.htm
+[ -f "$f" ] || exit 0
+grep -q 'cpustat -a' "$f" && exit 0
+grep -q ':Architecture%' "$f" || exit 0
+
+t=/tmp/.arch-new.$$
+cat > "$t" <<'EOF'
+		<tr><td width="33%"><%:Architecture%></td><td><% local _a=""; local _p=io.popen("/usr/bin/cpustat -a 2>/dev/null"); if _p then _a=_p:read("*a") or ""; _p:close() end; _a=_a:gsub("^%s+",""):gsub("%s+$",""); if _a=="" then _a=tostring(boardinfo.system or "ARMv8 Processor").." x "..tostring(luci.sys.exec("cat /proc/cpuinfo | grep 'processor' | wc -l") or "1") end %><%=pcdata(_a)%></td></tr>
+EOF
+awk -v nf="$t" '/:Architecture%/{while((getline l < nf)>0) print l; close(nf); next} {print}' "$f" > "$f.new" && mv "$f.new" "$f"
+rm -f "$t"
+rm -f /tmp/luci-indexcache
+rm -rf /tmp/luci-modulecache/* 2>/dev/null
+
+exit 0
