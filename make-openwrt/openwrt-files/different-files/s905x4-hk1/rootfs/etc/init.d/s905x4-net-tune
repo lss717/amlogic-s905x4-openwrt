@@ -1,0 +1,53 @@
+#!/bin/sh /etc/rc.common
+# SC2 (S905X4) 千兆网口吞吐优化。
+#
+# 1) TX completion coalescing。mainline stmmac (dwmac1000/gmac) 用全局默认
+#    STMMAC_COAL_TX_TIMER=5000us / STMMAC_TX_FRAMES=25，而且是靠软件 hrtimer
+#    兜底。本 MAC 只有单队列、无硬件 TSO，ring 默认 512；在这套参数下 TX 完成
+#    中断迟迟不触发（IC 位每 25 帧才置一次），ring 先填满 → ndo_start_xmit 返回
+#    busy → qdisc 大量 requeue，实测正向 TCP 被压在 ~500 Mbit/s。
+#    强制每包完成中断（tx-usecs 1 / tx-frames 1）+ RX 适度聚合（rx-usecs 50）
+#    + ring 1024 后正向 ~740 Mbit/s。判据：默认时 `tc -s qdisc` requeues 250万+，
+#    且压测中 `ethtool -S eth0` 的 tx_normal_irq_n 不增长。
+#
+# 2) CPU governor。默认 schedutil 在纯软中断负载下只升到 ~1.4-1.6GHz，且调度开销
+#    大；实测 performance（钉在 1.8GHz）能把单核 NAPI 上限从 ~740 抬到
+#    ~870-930 Mbit/s。ondemand 即使到 1.8GHz 也只有 ~785，故必须 performance。
+#
+# 3) eth0 MAC 中断默认落在 CPU3（该核上还有 netdata/tailscale），实测最差；
+#    固定到 CPU1。
+#
+# 综合结果（iperf3，对 192.168.10.2）：正向 ~500 → ~810，反向 ~700 → ~930；
+# 以 192.168.10.20 为服务端 `iperf3 -c 192.168.10.20 -R` ~740 → ~917 Mbit/s。
+
+START=39
+STOP=10
+
+start() {
+	local i irq
+
+	for i in $(seq 1 30); do
+		[ -d /sys/class/net/eth0 ] && break
+		sleep 1
+	done
+
+	# 1) TX/RX coalescing + ring
+	ethtool -C eth0 tx-usecs 1 tx-frames 1 rx-usecs 50 2>/dev/null
+	ethtool -G eth0 rx 1024 tx 1024 2>/dev/null
+
+	# 2) 固定 performance governor（等 cpufreq policy 就绪）
+	for i in $(seq 1 30); do
+		set -- /sys/devices/system/cpu/cpufreq/policy*/scaling_governor
+		[ -e "$1" ] && break
+		sleep 1
+	done
+	for i in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor; do
+		echo performance > "$i" 2>/dev/null
+	done
+
+	# 3) 把 MAC 中断从默认的 CPU3 挪到 CPU1
+	irq=$(awk -F: '/eth0$/ {gsub(/ /,"",$1); print $1; exit}' /proc/interrupts)
+	[ -n "$irq" ] && echo 2 > /proc/irq/$irq/smp_affinity 2>/dev/null
+}
+
+stop() { :; }
